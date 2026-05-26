@@ -35,7 +35,7 @@ Autodesk references:
 ## Install On Mac
 
 ```bash
-git clone https://github.com/YOUR_ACCOUNT/Easy-MCP-AutoCad.git
+git clone https://github.com/mwjdm/Easy-MCP-AutoCad.git
 cd Easy-MCP-AutoCad
 python3 -m venv .venv
 source .venv/bin/activate
