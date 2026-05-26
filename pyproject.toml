@@ -1,15 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "autocad-mcp-server"
-version = "0.1.0"
-description = "Add your description here"
+name = "autocad-mcp-server-macos"
+version = "0.2.0"
+description = "MCP server that generates AutoCAD-compatible DXF drawings on macOS"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
-    "comtypes>=1.4.10",
+    "ezdxf>=1.3.5",
     "mcp[cli]>=1.4.1",
-    "psycopg2-binary>=2.9.10",
-    "pyautocad>=0.2.0",
-    "pyinstaller>=6.12.0",
-    "pywin32>=309",
-    "sqlalchemy>=2.0.39",
 ]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.12.0"]
+test = ["pytest>=8.0"]
+
+[tool.setuptools]
+py-modules = ["server", "dxf_backend", "autocad_manager", "db_manager", "main"]

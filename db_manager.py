@@ -1,101 +1,59 @@
-from sqlalchemy import create_engine, MetaData, Table, Column, inspect
-from sqlalchemy.exc import SQLAlchemyError
+"""Small SQLite helper retained for integrations importing DatabaseManager."""
+
+from __future__ import annotations
+
+import sqlite3
 
 
 class DatabaseManager:
-    def __init__(self, connection_string):
-        """初始化数据库连接管理器"""
-        self.connection_string = connection_string
-        self.engine = None
-        self.metadata = None
-        self.inspector = None
-        
-    def connect(self):
-        """连接到数据库"""
+    def __init__(self, connection_string: str):
+        self.database_path = connection_string.removeprefix("sqlite:///")
+        self.connection: sqlite3.Connection | None = None
+
+    def connect(self) -> bool:
         try:
-            self.engine = create_engine(self.connection_string)
-            self.metadata = MetaData()
-            self.metadata.reflect(bind=self.engine)
-            self.inspector = inspect(self.engine)
+            self.connection = sqlite3.connect(self.database_path)
+            self.connection.row_factory = sqlite3.Row
             return True
-        except Exception as e:
-            print(f"数据库连接失败: {str(e)}")
+        except sqlite3.Error:
             return False
-            
-    def disconnect(self):
-        """断开数据库连接"""
-        if self.engine:
-            self.engine.dispose()
-            
-    def get_all_tables(self):
-        """获取所有表名"""
-        try:
-            return self.inspector.get_table_names()
-        except SQLAlchemyError as e:
-            return f"获取表列表失败: {str(e)}"
-            
-    def get_table_schema(self, table_name):
-        """获取指定表的结构信息"""
-        try:
-            if table_name not in self.metadata.tables:
-                return f"表 '{table_name}' 不存在"
-                
-            columns = []
-            for column in self.inspector.get_columns(table_name):
-                columns.append({
-                    "name": column['name'],
-                    "type": str(column['type']),
-                    "nullable": column['nullable'],
-                    "default": str(column['default']) if column['default'] else None
-                })
-                
-            # 获取主键
-            primary_keys = self.inspector.get_pk_constraint(table_name)
-            
-            # 获取外键
-            foreign_keys = []
-            for fk in self.inspector.get_foreign_keys(table_name):
-                foreign_keys.append({
-                    "name": fk['name'],
-                    "referred_table": fk['referred_table'],
-                    "referred_columns": fk['referred_columns'],
-                    "constrained_columns": fk['constrained_columns']
-                })
-                
-            # 获取索引
-            indices = []
-            for index in self.inspector.get_indexes(table_name):
-                indices.append({
-                    "name": index['name'],
-                    "columns": index['column_names'],
-                    "unique": index['unique']
-                })
-                
-            return {
-                "table_name": table_name,
-                "columns": columns,
-                "primary_key": primary_keys,
-                "foreign_keys": foreign_keys,
-                "indices": indices
-            }
-        except SQLAlchemyError as e:
-            return f"获取表 '{table_name}' 结构失败: {str(e)}"
-            
-    def execute_query(self, query, params=None):
-        """执行自定义查询"""
-        try:
-            with self.engine.connect() as connection:
-                if params:
-                    result = connection.execute(query, params)
-                else:
-                    result = connection.execute(query)
-                    
-                # 检查是否是SELECT查询
-                if result.returns_rows:
-                    columns = result.keys()
-                    rows = [dict(zip(columns, row)) for row in result]
-                    return {"columns": columns, "rows": rows}
-                else:
-                    return {"affected_rows": result.rowcount}
-        except SQLAlchemyError as e:
-            return f"执行查询失败: {str(e)}"
+
+    def disconnect(self) -> None:
+        if self.connection is not None:
+            self.connection.close()
+            self.connection = None
+
+    def _connection(self) -> sqlite3.Connection:
+        if self.connection is None:
+            raise RuntimeError("DatabaseManager is not connected.")
+        return self.connection
+
+    def get_all_tables(self) -> list[str]:
+        rows = self._connection().execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
+        )
+        return [row["name"] for row in rows]
+
+    def get_table_schema(self, table_name: str) -> dict:
+        safe_name = table_name.replace('"', '""')
+        columns = self._connection().execute(f'PRAGMA table_info("{safe_name}")').fetchall()
+        return {
+            "table_name": table_name,
+            "columns": [
+                {
+                    "name": column["name"],
+                    "type": column["type"],
+                    "nullable": not bool(column["notnull"]),
+                    "default": column["dflt_value"],
+                }
+                for column in columns
+            ],
+        }
+
+    def execute_query(self, query: str, params: tuple | None = None):
+        connection = self._connection()
+        cursor = connection.execute(query, params or ())
+        if cursor.description:
+            return [dict(row) for row in cursor.fetchall()]
+        connection.commit()
+        return {"affected_rows": cursor.rowcount}

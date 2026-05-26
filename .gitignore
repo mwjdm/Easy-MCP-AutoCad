@@ -1,4 +1,5 @@
-Python
+# Python
+__pycache__/
 pycache/
 *.py[cod]
 *$py.class
@@ -23,22 +24,22 @@ var/
 .venv
 venv/
 ENV/
-PyInstaller
+# PyInstaller
 dist/
 build/
-Database
+# Database
 *.db
 *.sqlite
 *.sqlite3
-AutoCAD files
+# AutoCAD files
 *.dwg
 *.dxf
 *.bak
-IDE files
+# IDE files
 .idea/
 .vscode/
 *.swp
 *.swo
-OS specific
+# OS specific
 .DS_Store
 Thumbs.db
